@@ -1,0 +1,18 @@
+# Install as ~/.config/onionmint/config.toml (or pass it with -c/--config).
+filters = ["neko"]
+output_dir = "./keys"
+threads = 4
+keys = 2
+words = 1
+
+# Optional settings:
+# filter_file = "filters.txt"
+# output_file = "onions.txt"
+# overwrite_output = false
+# quiet = false
+# verbose = false
+# names_only = false
+# include_dir = false
+# yaml = false
+# raw_yaml = false
+# dedup = false
