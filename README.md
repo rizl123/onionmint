@@ -2,9 +2,9 @@
 
 `onionmint` is an AI-assisted Rust rewrite of [mkp224o](https://github.com/cathugger/mkp224o), a vanity address generator for Tor v3 onion services. It uses no assembly and no libsodium. The cryptographic primitives come from `ed25519-dalek`, `sha2`, and `sha3`.
 
-## Respect for the original project
+## License and acknowledgment
 
-I respect the work behind mkp224o. I require everyone who uses onionmint to respect the original authors' work and acknowledge mkp224o as the project this utility is based on.
+Onionmint is distributed under the MIT License; see [LICENSE](LICENSE). It is based on the approach and work of [mkp224o](https://github.com/cathugger/mkp224o), whose authors are acknowledged here.
 
 ## Build
 

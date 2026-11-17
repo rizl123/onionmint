@@ -2,6 +2,10 @@
 name = "onionmint"
 version = "0.1.0"
 edition = "2024"
+description = "Vanity address generator for Tor v3 onion services"
+license = "MIT"
+repository = "https://github.com/rizl123/onionmint"
+readme = "README.md"
 
 [[bin]]
 name = "onionmint"
