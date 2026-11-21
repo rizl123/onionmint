@@ -17,9 +17,11 @@
 
 ## Development
 
-- The binary entry point is `src/main.rs`; CLI/configuration, key search, and output code live in `src/cli.rs`, `src/config.rs`, `src/crypto.rs`, and `src/output.rs`.
+- The binary entry point is `src/main.rs`; CLI/configuration, key search, output, deterministic seeds, and YAML import code live in `src/cli.rs`, `src/config.rs`, `src/crypto.rs`, `src/output.rs`, `src/seeds.rs`, and `src/yaml_input.rs`.
 - Update `Cargo.toml` and `Cargo.lock` together when changing dependencies.
 - Format with `cargo fmt` and check compilation with `cargo check` after Rust changes.
+- Keep Rustdoc comments on modules and relevant items in sync with behavior. The crate-level `cargo doc` page includes `README.md`; keep both accurate and run `cargo doc --no-deps` after documentation changes.
+- Use `cargo doc --no-deps --document-private-items` when checking implementation-level Rustdoc for private modules and items.
 - Avoid adding dependencies when the standard library or existing crates are sufficient.
 - Keep every `.rs` file to at most 300 lines; split larger modules into focused files.
 - Use TDD for behavior changes: write or update a test first, run it to confirm it fails for the expected reason, implement the change, then rerun the relevant tests.

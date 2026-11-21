@@ -14,6 +14,20 @@ Rust and Cargo are required.
 cargo build --release
 ```
 
+## Rust documentation
+
+The generated crate page includes this README, and Rustdoc comments describe the implementation modules and their key items. Build the user-facing documentation with:
+
+```sh
+cargo doc --no-deps
+```
+
+Open `target/doc/onionmint/index.html` to read it. To include private implementation modules and items in the generated pages, run:
+
+```sh
+cargo doc --no-deps --document-private-items
+```
+
 ## Generate addresses
 
 Pass one or more case-insensitive base32 prefixes. Onionmint writes a Tor-compatible key directory for every match:
