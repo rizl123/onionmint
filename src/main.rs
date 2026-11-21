@@ -1,3 +1,10 @@
+#![doc = include_str!("../README.md")]
+
+//! Executable entry point and concurrent search coordinator.
+//!
+//! Key derivation, filtering, checkpoint persistence, and output formatting
+//! are implemented in the sibling modules.
+
 mod cli;
 mod config;
 mod crypto;
@@ -19,6 +26,7 @@ use crate::crypto::{KeyCursor, matches_public_key, onion_name, parse_filters};
 use crate::output::{emit_with_warning, print_banner};
 use crate::seeds::SeedState;
 
+/// Atomically reserve one match, enforcing the optional global result limit.
 fn claim_match(done: &AtomicU64, limit: u64, stop: &AtomicBool) -> bool {
     if limit == 0 {
         done.fetch_add(1, Ordering::Relaxed);
@@ -43,6 +51,7 @@ fn claim_match(done: &AtomicU64, limit: u64, stop: &AtomicBool) -> bool {
     }
 }
 
+/// Parse settings and run import mode or the parallel vanity search.
 fn run() -> Result<(), String> {
     let mut cfg = parse_args()?;
     let seed_state = cfg
@@ -245,6 +254,7 @@ fn run() -> Result<(), String> {
     Ok(())
 }
 
+/// Start onionmint and report fatal errors to stderr.
 fn main() {
     if let Err(e) = run() {
         eprintln!("{e}");

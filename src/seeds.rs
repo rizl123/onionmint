@@ -1,8 +1,15 @@
+//! Deterministic search seed derivation and checkpoint persistence.
+//!
+//! A passphrase is expanded with Argon2id into a 32-byte origin seed. The
+//! current seed advances as a little-endian counter, so a checkpoint can
+//! store a compact offset and resume the same search sequence.
+
 use argon2::{Algorithm, Argon2, Params, Version};
 use std::fs::{self, OpenOptions};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
+/// Tracks the deterministic search sequence and optional resume checkpoint.
 pub(crate) struct SeedState {
     origin: [u8; 32],
     current: [u8; 32],
@@ -10,6 +17,7 @@ pub(crate) struct SeedState {
 }
 
 impl SeedState {
+    /// Derive a deterministic seed from `passphrase` and load its checkpoint.
     pub(crate) fn new(passphrase: &str, checkpoint: Option<PathBuf>) -> Result<Self, String> {
         let params = Params::new(65_536, 48, 1, Some(32))
             .map_err(|error| format!("invalid Argon2 parameters: {error}"))?;
@@ -29,11 +37,13 @@ impl SeedState {
         })
     }
 
+    /// Advance the sequence and return its next 32-byte seed.
     pub(crate) fn next_seed(&mut self) -> [u8; 32] {
         increment(&mut self.current);
         self.current
     }
 
+    /// Persist the current offset when checkpointing is enabled.
     pub(crate) fn save_checkpoint(&self) -> Result<(), String> {
         let Some(path) = &self.checkpoint else {
             return Ok(());

@@ -1,3 +1,9 @@
+//! Key-file creation and machine-readable result output.
+//!
+//! Filesystem output uses Tor's `hs_ed25519_*` key-file prefixes and creates
+//! secret key files with owner-only permissions on Unix. YAML and name output
+//! are serialized separately from status messages, which go to stderr.
+
 use crate::config::Config;
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, Write};
@@ -8,6 +14,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 const PUB_PREFIX: &[u8; 32] = b"== ed25519v1-public: type0 ==\0\0\0";
 const SEC_PREFIX: &[u8; 32] = b"== ed25519v1-secret: type0 ==\0\0\0";
 
+/// Print a plain-text summary of the active search settings to stderr.
 pub(crate) fn print_banner(cfg: &Config) {
     let rule = "────────────────────────────────────────";
     eprintln!("onionmint {}", env!("CARGO_PKG_VERSION"));
@@ -64,6 +71,7 @@ fn write_new(path: &Path, data: &[u8]) -> io::Result<()> {
 }
 
 #[cfg(test)]
+/// Emit one result using the standard output policy without a proximity mark.
 pub(crate) fn emit(
     cfg: &Config,
     name: &str,
@@ -74,6 +82,10 @@ pub(crate) fn emit(
     emit_with_warning(cfg, name, pk, sk, output, false)
 }
 
+/// Write one generated result as YAML or as a Tor key directory.
+///
+/// The optional `near` flag annotates a result that follows another match
+/// from the same deterministic seed. Secret key bytes are never logged.
 pub(crate) fn emit_with_warning(
     cfg: &Config,
     name: &str,
@@ -149,6 +161,7 @@ fn utc_timestamp() -> String {
     format!("{year:04}-{month:02}-{day:02} {hour:02}:{minute:02}:{second:02} Z")
 }
 
+/// Create `<hostname>.onion/` with Tor-compatible key files and permissions.
 pub(crate) fn write_key_files(
     output_dir: &Path,
     name: &str,
@@ -183,6 +196,7 @@ pub(crate) fn write_key_files(
     Ok(())
 }
 
+/// Encode bytes using standard padded Base64.
 pub(crate) fn base64(data: &[u8]) -> String {
     const A: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let mut out = String::new();

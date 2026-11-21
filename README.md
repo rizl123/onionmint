@@ -4,7 +4,7 @@
 
 ## License and acknowledgment
 
-Onionmint is distributed under the MIT License; see [LICENSE](LICENSE). It is based on the approach and work of [mkp224o](https://github.com/cathugger/mkp224o), whose authors are acknowledged here.
+Onionmint is distributed under the MIT License; see the [LICENSE file](https://github.com/rizl123/onionmint/blob/main/LICENSE). It is based on the approach and work of [mkp224o](https://github.com/cathugger/mkp224o), whose authors are acknowledged here.
 
 ## Build
 

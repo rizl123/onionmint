@@ -1,16 +1,28 @@
+//! Ed25519 candidate generation, Tor v3 onion encoding, and filter matching.
+//!
+//! A cursor starts from a clamped Ed25519 scalar and advances by adding
+//! eight times the base point. This preserves the search sequence while
+//! avoiding a fresh scalar multiplication for every candidate.
+
 use curve25519_dalek::edwards::EdwardsPoint;
 use curve25519_dalek::scalar::Scalar;
 use sha2::{Digest as _, Sha256, Sha512};
 use sha3::Sha3_256;
 
+/// Lowercase RFC 4648 base32 alphabet used by Tor v3 onion names.
 pub(crate) const ALPHABET: &[u8; 32] = b"abcdefghijklmnopqrstuvwxyz234567";
 
+/// A normalized filter represented as base32 symbols and comparison bits.
 #[derive(Clone)]
 pub(crate) struct FilterBits {
     symbols: Vec<u8>,
     bits: usize,
 }
 
+/// Incremental Ed25519 key candidate cursor.
+///
+/// `scalar_bytes` and `prefix` are the expanded Ed25519 secret key halves;
+/// `point` is the public point corresponding to the scalar.
 pub(crate) struct KeyCursor {
     scalar_bytes: [u8; 32],
     prefix: [u8; 32],
@@ -18,12 +30,14 @@ pub(crate) struct KeyCursor {
 }
 
 impl KeyCursor {
+    /// Create a cursor from 32 bytes drawn from the OS random source.
     pub(crate) fn random() -> Self {
         let mut seed = [0u8; 32];
         getrandom::getrandom(&mut seed).expect("operating system random source failed");
         Self::from_seed(&seed)
     }
 
+    /// Expand a 32-byte Ed25519 seed into the scalar, prefix, and public point.
     pub(crate) fn from_seed(seed: &[u8; 32]) -> Self {
         let digest = Sha512::digest(seed);
         let mut scalar_bytes: [u8; 32] = digest[..32].try_into().unwrap();
@@ -40,6 +54,7 @@ impl KeyCursor {
         }
     }
 
+    /// Randomize the secret key's prefix while preserving its public key.
     pub(crate) fn reseed_prefix(&mut self) {
         let mut random = [0; 32];
         getrandom::getrandom(&mut random).expect("operating system random source failed");
@@ -49,10 +64,12 @@ impl KeyCursor {
         self.prefix = hash.finalize().into();
     }
 
+    /// Return the compressed Ed25519 public key for the current scalar.
     pub(crate) fn public_key(&self) -> [u8; 32] {
         self.point.compress().to_bytes()
     }
 
+    /// Return the 64-byte expanded secret key for the current candidate.
     pub(crate) fn secret_key(&self) -> [u8; 64] {
         let mut secret = [0u8; 64];
         secret[..32].copy_from_slice(&self.scalar_bytes);
@@ -60,8 +77,10 @@ impl KeyCursor {
         secret
     }
 
-    /// Move to the next candidate at scalar + 8. False means the clamped
-    /// scalar range was exhausted and this worker should start from a new seed.
+    /// Advance to scalar + 8 and add the corresponding point to the cursor.
+    ///
+    /// Returns `false` when adding eight would leave the clamped scalar range;
+    /// the worker should then start from a new seed.
     pub(crate) fn advance(&mut self, step_point: &EdwardsPoint) -> bool {
         let mut carry = 8u16;
         for byte in &mut self.scalar_bytes {
@@ -81,6 +100,7 @@ impl KeyCursor {
 }
 
 impl FilterBits {
+    /// Parse a validated lowercase base32 filter into comparison symbols.
     pub(crate) fn parse(filter: &str) -> Self {
         let symbols: Vec<u8> = filter
             .bytes()
@@ -91,6 +111,7 @@ impl FilterBits {
     }
 }
 
+/// Convert validated filter strings into their bit-oriented representation.
 pub(crate) fn parse_filters(filters: &[String]) -> Vec<FilterBits> {
     filters
         .iter()
@@ -98,6 +119,7 @@ pub(crate) fn parse_filters(filters: &[String]) -> Vec<FilterBits> {
         .collect()
 }
 
+/// Encode bytes as lowercase RFC 4648 base32 without padding.
 pub(crate) fn base32(data: &[u8]) -> String {
     let mut out = String::with_capacity((data.len() * 8 + 4) / 5);
     let mut acc = 0u32;
@@ -116,6 +138,7 @@ pub(crate) fn base32(data: &[u8]) -> String {
     out
 }
 
+/// Build a checksummed v3 onion service name from a 32-byte public key.
 pub(crate) fn onion_name(pubkey: &[u8; 32]) -> String {
     let mut h = Sha3_256::new();
     h.update(b".onion checksum");
@@ -168,6 +191,10 @@ fn matches_words_from(
     })
 }
 
+/// Test whether a compressed public key matches the requested filter sequence.
+///
+/// `words` controls how many consecutive filters must match; filters may be
+/// selected in any order at each position.
 pub(crate) fn matches_public_key(pubkey: &[u8; 32], filters: &[FilterBits], words: usize) -> bool {
     words > 0 && matches_words_from(pubkey, filters, 0, words)
 }

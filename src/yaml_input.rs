@@ -1,3 +1,9 @@
+//! Import Tor key records from the YAML subset emitted by onionmint.
+//!
+//! Input may come from a file or standard input. Each selected record is
+//! validated, normalized to the Tor key-file representation, and written as
+//! a key directory using the shared output implementation.
+
 use crate::output::write_key_files;
 use std::fs;
 use std::fs::File;
@@ -15,6 +21,11 @@ struct Record {
     secret: Option<Vec<u8>>,
 }
 
+/// Import YAML key records into filesystem key directories.
+///
+/// `input` set to `None` or `-` reads standard input. When `selected_host` is
+/// supplied, only that exact onion hostname is imported. The `raw` option
+/// selects key data without Tor's 32-byte type prefix.
 pub(crate) fn import(
     input: Option<&Path>,
     selected_host: Option<&str>,

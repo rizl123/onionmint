@@ -1,3 +1,8 @@
+//! Command-line parsing, configuration precedence, and filter validation.
+//!
+//! Configuration values provide defaults. CLI options are then applied, and
+//! positional filters replace filters loaded from the config file.
+
 use crate::config::{Config, FileConfig, default_config_path};
 use crate::crypto::ALPHABET;
 use crate::help::{help, version};
@@ -6,6 +11,7 @@ use std::io::{self, BufRead};
 use std::path::PathBuf;
 use std::thread;
 
+/// Parse the process arguments using the default user configuration path.
 pub(crate) fn parse_args() -> Result<Config, String> {
     let raw_args: Vec<String> = std::env::args().skip(1).collect();
     let program = std::env::args()
@@ -14,6 +20,9 @@ pub(crate) fn parse_args() -> Result<Config, String> {
     parse_args_from(raw_args, &program, default_config_path())
 }
 
+/// Parse arguments with an injectable config path, primarily for unit tests.
+///
+/// `default_path` is consulted only when no `-c`/`--config` option is given.
 pub(crate) fn parse_args_from(
     raw_args: Vec<String>,
     program: &str,

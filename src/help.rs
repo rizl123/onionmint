@@ -1,5 +1,11 @@
+//! Terminal help and version text.
+//!
+//! This text documents the supported CLI surface and is kept in sync with the
+//! README configuration and usage sections.
+
 use std::path::Path;
 
+/// Print usage help, substituting the executable's displayed name.
 pub(crate) fn help(program: &str) {
     const HELP: &str = r#"onionmint — Tor v3 onion vanity address generator
 
@@ -106,6 +112,7 @@ Respect for the original project
     print!("{}", HELP.replace("@PROGRAM@", program));
 }
 
+/// Print the package version and the project's attribution notice.
 pub(crate) fn version() {
     println!("onionmint {}", env!("CARGO_PKG_VERSION"));
     println!("AI-assisted Rust rewrite of mkp224o; no assembly or libsodium.");
