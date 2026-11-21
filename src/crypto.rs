@@ -1,6 +1,6 @@
 use curve25519_dalek::edwards::EdwardsPoint;
 use curve25519_dalek::scalar::Scalar;
-use sha2::{Digest as _, Sha512};
+use sha2::{Digest as _, Sha256, Sha512};
 use sha3::Sha3_256;
 
 pub(crate) const ALPHABET: &[u8; 32] = b"abcdefghijklmnopqrstuvwxyz234567";
@@ -21,6 +21,10 @@ impl KeyCursor {
     pub(crate) fn random() -> Self {
         let mut seed = [0u8; 32];
         getrandom::getrandom(&mut seed).expect("operating system random source failed");
+        Self::from_seed(&seed)
+    }
+
+    pub(crate) fn from_seed(seed: &[u8; 32]) -> Self {
         let digest = Sha512::digest(seed);
         let mut scalar_bytes: [u8; 32] = digest[..32].try_into().unwrap();
         scalar_bytes[0] &= 248;
@@ -34,6 +38,15 @@ impl KeyCursor {
             prefix,
             point,
         }
+    }
+
+    pub(crate) fn reseed_prefix(&mut self) {
+        let mut random = [0; 32];
+        getrandom::getrandom(&mut random).expect("operating system random source failed");
+        let mut hash = Sha256::new();
+        hash.update(self.prefix);
+        hash.update(random);
+        self.prefix = hash.finalize().into();
     }
 
     pub(crate) fn public_key(&self) -> [u8; 32] {

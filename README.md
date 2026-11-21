@@ -1,6 +1,6 @@
 # onionmint
 
-`onionmint` is an AI-assisted Rust rewrite of [mkp224o](https://github.com/cathugger/mkp224o), a vanity address generator for Tor v3 onion services. It uses no assembly and no libsodium. The cryptographic primitives come from `ed25519-dalek`, `sha2`, and `sha3`.
+`onionmint` is an AI-assisted Rust rewrite of [mkp224o](https://github.com/cathugger/mkp224o), a vanity address generator for Tor v3 onion services. It uses no handwritten assembly and no libsodium. The cryptographic primitives come from `curve25519-dalek`, `sha2`, and `sha3`.
 
 ## License and acknowledgment
 
@@ -55,6 +55,8 @@ Config values act as defaults. CLI options are applied afterward; command-line f
 | `yaml` | boolean | `false` | Write generated key records as YAML |
 | `raw_yaml` | boolean | `false` | Omit Tor key prefixes in YAML output |
 | `dedup` | boolean | `false` | Remove duplicate filters |
+| `stats_interval` | integer | unset | Print statistics every N seconds; `0` is invalid |
+| `stats_total` | boolean | `false` | Report cumulative instead of interval statistics |
 
 ## Command-line options
 
@@ -74,7 +76,16 @@ Config values act as defaults. CLI options are applied afterward; command-line f
 | `-x` | Suppress printed onion names |
 | `-F` | Include output directory in printed names |
 | `-y` | Write key records as YAML |
-| `--rawyaml` | Write unprefixed keys with `-y` |
+| `-Y [FILE [HOST]]` | Import keys from YAML file or stdin into key directories |
+| `--rawyaml` | Read or write unprefixed keys with `-y` or `-Y` |
+| `-s` | Print search statistics every 10 seconds |
+| `-S SECONDS` | Set the statistics reporting interval |
+| `-T` | Report cumulative statistics instead of interval rates |
+| `-p PASSPHRASE` | Derive a repeatable seed using Argon2id |
+| `-P` | Read the passphrase from the `PASSPHRASE` environment variable |
+| `--checkpoint FILE` | Resume and save deterministic search progress |
+| `--skipnear` | Start a new deterministic seed after a match |
+| `--warnnear` | Mark additional matches found from the same deterministic seed |
 | `-h`, `--help` | Show help |
 | `-V`, `--version` | Show version |
 
@@ -84,4 +95,6 @@ Filter files contain one prefix per line; blank lines and lines starting with `#
 
 Status is shown on stderr as a compact plain-text summary with no color. Onion names remain plain text on stdout or in the selected output file.
 
-For speed, onionmint derives an initial Ed25519 point from a random seed, then advances through candidate scalars by adding the corresponding multiple of the base point. This avoids a full scalar multiplication for every candidate. The original C program's batched point compression, passphrase/checkpoint mode, YAML import (`-Y`), and optional statistics are not implemented, so throughput and CLI coverage still differ from mkp224o.
+For speed, onionmint derives an initial Ed25519 point from a random seed, then advances through candidate scalars by adding the corresponding multiple of the base point. This avoids a full scalar multiplication for every candidate. YAML import (`-Y`) and export (`-y`) support Tor-prefixed keys and raw key bytes. Passphrase mode uses the same Argon2id parameters and deterministic seed progression as mkp224o. The original C program's batched point compression remains unimplemented, so throughput can differ.
+
+Run the dependency-free search microbenchmark with `cargo bench --bench search`. It measures candidate point advancement and filter matching; use it as a baseline when changing the hot search loop.

@@ -28,7 +28,15 @@ pub(crate) struct Config {
     pub(crate) include_dir: bool,
     pub(crate) yaml: bool,
     pub(crate) raw_yaml: bool,
+    pub(crate) yaml_input: Option<PathBuf>,
+    pub(crate) yaml_hostname: Option<String>,
+    pub(crate) stats_interval: Option<u64>,
+    pub(crate) stats_total: bool,
     pub(crate) dedup: bool,
+    pub(crate) passphrase: Option<String>,
+    pub(crate) checkpoint: Option<PathBuf>,
+    pub(crate) skip_near: bool,
+    pub(crate) warn_near: bool,
 }
 
 #[derive(Default, Deserialize)]
@@ -49,4 +57,6 @@ pub(crate) struct FileConfig {
     pub(crate) yaml: bool,
     pub(crate) raw_yaml: bool,
     pub(crate) dedup: bool,
+    pub(crate) stats_interval: Option<u64>,
+    pub(crate) stats_total: bool,
 }

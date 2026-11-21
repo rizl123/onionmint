@@ -16,3 +16,5 @@ words = 1
 # yaml = false
 # raw_yaml = false
 # dedup = false
+# stats_interval = 10
+# stats_total = false

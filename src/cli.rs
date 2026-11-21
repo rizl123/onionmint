@@ -1,111 +1,10 @@
 use crate::config::{Config, FileConfig, default_config_path};
 use crate::crypto::ALPHABET;
+use crate::help::{help, version};
 use std::fs::{self, File};
 use std::io::{self, BufRead};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::thread;
-
-fn help(program: &str) {
-    const HELP: &str = r#"onionmint — Tor v3 onion vanity address generator
-
-Usage:
-  @PROGRAM@ FILTER [FILTER ...] [OPTION ...]
-  @PROGRAM@ -f FILTERFILE [FILTER ...] [OPTION ...]
-
-Filters
-  Filters are case-insensitive base32 prefixes of the onion address.
-  Valid characters are a-z and 2-7. The maximum filter length is 52 chars.
-  A leading ^ is accepted and ignored. Use -N to require consecutive
-  matching prefixes, for example: -N 2 neko cat.
-
-Configuration
-  By default, settings are loaded from:
-    $XDG_CONFIG_HOME/onionmint/config.toml
-  or, when XDG_CONFIG_HOME is unset:
-    ~/.config/onionmint/config.toml
-  If this file does not exist, built-in defaults are used. -c/--config loads
-  a specific TOML file instead. Command-line options are applied after config;
-  command-line filters replace filters from the config.
-
-  Supported TOML keys:
-    filters          = ["prefix", ...]   default: []
-    filter_file      = "filters.txt"     default: unset
-    output_dir       = "./keys"          default: .
-    output_file      = "names.txt"       default: stdout
-    overwrite_output = false             default: false (append)
-    threads          = 4                 default: available CPU count
-    keys             = 10                default: 0 (unlimited)
-    words            = 1                 default: 1
-    quiet            = false
-    verbose          = false
-    names_only       = false
-    include_dir      = false
-    yaml             = false
-    raw_yaml         = false
-    dedup            = false
-
-Options
-  -c, --config FILE   Load the specified TOML config instead of the default.
-  -f FILE             Load filters from a file. Blank lines and lines starting
-                      with # or // are ignored. Can be combined with filters.
-  -D                  Deduplicate filters.
-  -q                  Suppress status and diagnostic messages on stderr.
-  -v                  Print each generated address to stderr as it is found.
-  -x                  Do not print address names in filesystem output mode.
-  -o FILE             Append names (or YAML records with -y) to FILE.
-  -O FILE             Write names (or YAML records with -y) to FILE, replacing
-                      its previous contents.
-  -F                  Include the output directory in printed address names.
-  -d DIR              Store key directories under DIR (default: current dir).
-  -t N, -j N           Use N worker threads (default: available CPU count).
-  -n N                 Stop after N matching keys. 0 means unlimited.
-  -N N                 Require N consecutive matching filter prefixes.
-  -y                  Write generated keys as YAML instead of creating folders.
-  --rawyaml            With -y, omit Tor's key-file prefixes from encoded keys.
-  -Z, -z, -B           Accepted for compatibility; have no effect.
-  -h, --help           Show this complete help text.
-  -V, --version        Show version and project acknowledgement.
-
-Output
-  Filesystem mode creates <address>.onion/ containing:
-    hs_ed25519_secret_key
-    hs_ed25519_public_key
-    hostname
-  On Unix, the secret key file is created with permissions 0600. Onion names
-  are printed to stdout unless -x is set; -o/-O redirects that list.
-  YAML mode writes records to stdout or to the file selected by -o/-O.
-  Status output is plain text without color.
-
-Examples
-  @PROGRAM@ neko
-  @PROGRAM@ -d ./keys -t 4 -n 2 neko
-  @PROGRAM@ -f filters.txt -N 2
-  @PROGRAM@ -c ~/.config/onionmint/config.toml
-  @PROGRAM@ -y -n 1 neko > key-record.yaml
-
-About this rewrite
-  onionmint is an AI-assisted Rust rewrite of mkp224o. It uses no assembly
-  and no libsodium. The original C project's batching optimization,
-  passphrase/checkpoint mode, YAML import, and statistics are not implemented.
-  Original project: https://github.com/cathugger/mkp224o
-
-Respect for the original project
-  I respect the work behind mkp224o and require all onionmint users to respect
-  the original authors' work and acknowledge mkp224o as the source project.
-"#;
-    let program = Path::new(program)
-        .file_name()
-        .and_then(|name| name.to_str())
-        .unwrap_or("onionmint");
-    print!("{}", HELP.replace("@PROGRAM@", program));
-}
-
-fn version() {
-    println!("onionmint {}", env!("CARGO_PKG_VERSION"));
-    println!("AI-assisted Rust rewrite of mkp224o; no assembly or libsodium.");
-    println!("I respect the original authors' work and require users to acknowledge it.");
-    println!("Original project: https://github.com/cathugger/mkp224o");
-}
 
 pub(crate) fn parse_args() -> Result<Config, String> {
     let raw_args: Vec<String> = std::env::args().skip(1).collect();
@@ -178,6 +77,8 @@ pub(crate) fn parse_args_from(
         cfg.yaml = file.yaml;
         cfg.raw_yaml = file.raw_yaml;
         cfg.dedup = file.dedup;
+        cfg.stats_interval = file.stats_interval;
+        cfg.stats_total = file.stats_total;
     }
     let mut it = cli_args.into_iter().peekable();
     let mut cli_filters_supplied = false;
@@ -192,6 +93,20 @@ pub(crate) fn parse_args_from(
         }
         if arg == "--rawyaml" {
             cfg.raw_yaml = true;
+            continue;
+        }
+        if arg == "--checkpoint" {
+            cfg.checkpoint = Some(it.next().ok_or("--checkpoint requires a path")?.into());
+            continue;
+        }
+        if arg == "--skipnear" {
+            cfg.skip_near = true;
+            cfg.warn_near = false;
+            continue;
+        }
+        if arg == "--warnnear" {
+            cfg.warn_near = true;
+            cfg.skip_near = false;
             continue;
         }
         if arg.starts_with('-') && arg != "-" {
@@ -221,6 +136,36 @@ pub(crate) fn parse_args_from(
                     'F' => cfg.include_dir = true,
                     'D' => cfg.dedup = true,
                     'y' => cfg.yaml = true,
+                    's' => cfg.stats_interval = Some(10),
+                    'S' => {
+                        cfg.stats_interval = Some(
+                            value()?
+                                .parse()
+                                .map_err(|_| "invalid statistics interval")?,
+                        )
+                    }
+                    'T' => cfg.stats_total = true,
+                    'p' => cfg.passphrase = Some(value()?),
+                    'P' => {
+                        cfg.passphrase =
+                            Some(std::env::var("PASSPHRASE").map_err(
+                                |_| "store passphrase in PASSPHRASE environment variable",
+                            )?)
+                    }
+                    'Y' => {
+                        cfg.yaml_input =
+                            Some(if it.peek().is_some_and(|arg| !arg.starts_with('-')) {
+                                match it.next().unwrap().as_str() {
+                                    "" => PathBuf::from("-"),
+                                    path => path.into(),
+                                }
+                            } else {
+                                PathBuf::from("-")
+                            });
+                        if it.peek().is_some_and(|arg| !arg.starts_with('-')) {
+                            cfg.yaml_hostname = it.next().filter(|host| !host.is_empty());
+                        }
+                    }
                     'Z' | 'z' | 'B' => {}
                     'd' => cfg.output_dir = value()?.into(),
                     't' | 'j' => {
@@ -262,8 +207,24 @@ pub(crate) fn parse_args_from(
             }
         }
     }
-    if cfg.raw_yaml && !cfg.yaml {
-        return Err("--rawyaml requires -y".into());
+    if cfg.raw_yaml && !cfg.yaml && cfg.yaml_input.is_none() {
+        return Err("--rawyaml requires -y or -Y".into());
+    }
+    if cfg.yaml && cfg.yaml_input.is_some() {
+        return Err("-y and -Y cannot be used together".into());
+    }
+    if cfg
+        .yaml_hostname
+        .as_ref()
+        .is_some_and(|host| host.len() != 62)
+    {
+        return Err("bad onion argument length".into());
+    }
+    if cfg.stats_interval == Some(0) {
+        return Err("statistics interval must be positive".into());
+    }
+    if cfg.checkpoint.is_some() && cfg.passphrase.is_none() {
+        return Err("--checkpoint requires passphrase".into());
     }
     if cfg.words == 0 || cfg.threads == 0 {
         return Err("thread count and word count must be positive".into());
@@ -284,7 +245,7 @@ pub(crate) fn parse_args_from(
         good.dedup();
     }
     cfg.filters = good;
-    if cfg.filters.is_empty() {
+    if cfg.filters.is_empty() && cfg.yaml_input.is_none() {
         return Err("no valid filters specified".into());
     }
     Ok(cfg)
